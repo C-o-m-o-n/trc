@@ -13,6 +13,9 @@ from datetime import datetime
 publishKey = 'demo'
 subscribeKey = 'demo'
 
+# Constraints
+MAX_MSG_LEN = 2000 # Backend limit higher than UI to allow for formatting
+
 # flag to help with graceful shutdown
 running = True
 
@@ -115,7 +118,14 @@ def getActiveChannels():
 
 def send(channel: str, payload: dict):
     """Send a message and return status dict"""
-    encoded_payload = quote(json.dumps(payload), safe='')
+    json_data = json.dumps(payload)
+    
+    # Basic length validation fallback
+    if len(json_data) > MAX_MSG_LEN:
+        add_log(f"Send rejected: Payload too large ({len(json_data)} characters)", "WARNING")
+        return {"success": False, "error": f"Payload too large (Max {MAX_MSG_LEN})", "code": 413}
+
+    encoded_payload = quote(json_data, safe='')
     send_url = f'https://ps.pndsn.com/publish/{publishKey}/{subscribeKey}/0/{channel}/0/{encoded_payload}'
     try:
         response = requests.get(send_url, timeout=5)

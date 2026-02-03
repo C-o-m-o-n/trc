@@ -60,6 +60,7 @@ def show_logs(count=20):
     else:
         print(f"{CYAN}No diagnostic logs captured yet.{RESET}")
     print(f"{RED}--- End of Logs ---{RESET}\n")
+    input(f"{YELLOW}Press Enter to continue...{RESET}")
 
 def show_help():
     """Display available commands"""
@@ -80,6 +81,7 @@ def show_help():
 ║  {CYAN}/logout{YELLOW}       - Leave the chat         ║
 ╚══════════════════════════════════════════╝{RESET}
 """)
+    input(f"{YELLOW}Press Enter to continue...{RESET}")
 
 def show_channels():
     """Display list of joined channels"""
@@ -191,13 +193,18 @@ def handle_command(command):
         switch_channel(args[0] if args else "")
     
     elif cmd == "history":
-        count = 10
-        if args:
-            try:
-                count = int(args[0])
-            except ValueError:
-                print(f"{RED}Invalid number. Using default (10).{RESET}")
-        show_history(current_channel, count)
+        if not args:
+             show_history(current_channel, 10)
+             return
+             
+        try:
+            count = int(args[0])
+            if count <= 0:
+                print(f"{RED}❌ Please enter a positive number for history.{RESET}")
+                return
+            show_history(current_channel, count)
+        except ValueError:
+            print(f"{RED}❌ Invalid number: '{args[0]}'. Usage: /history N{RESET}")
     
     elif cmd == "logs":
         count = 20
@@ -274,10 +281,29 @@ def on_message_received(channel, data):
 
 # Welcome and get username
 print(f"{BOLD}{GREEN}Welcome to Chat!{RESET}")
-current_user = input(f"{BLUE}Username: {YELLOW}").strip()
 
-if not current_user:
-    current_user = "Anonymous"
+while True:
+    user_input = input(f"{BLUE}Username: {YELLOW}").strip()
+    
+    # 1. Check if empty
+    if not user_input:
+        print(f"{RED}❌ Username cannot be empty.{RESET}")
+        continue
+        
+    # 2. Check for reserved names (spoof prevention)
+    reserved = ["SYSTEM", "ADMIN", "ROOT", "SERVER", "MODERATOR"]
+    if user_input.upper() in reserved:
+        print(f"{RED}❌ '{user_input}' is a reserved system name. Please choose another.{RESET}")
+        continue
+        
+    # 3. Check for invalid characters (newlines/tabs)
+    if "\n" in user_input or "\r" in user_input or "\t" in user_input:
+        print(f"{RED}❌ Username contains invalid characters.{RESET}")
+        continue
+        
+    # All checks passed
+    current_user = user_input
+    break
 
 print(f"{GREEN}Joined as {current_user}. Type /help for commands.{RESET}")
 print(f"{CYAN}Starting in #{current_channel}{RESET}\n")
@@ -296,6 +322,11 @@ while True:
     message = input(f"{MAGENTA}#{current_channel} {BLUE}> {RESET}").strip()
     
     if not message:
+        continue
+    
+    # Check for excessive length
+    if len(message) > 1000:
+        print(f"{RED}❌ Message too long! ({len(message)}/1000 characters). Please shorten it.{RESET}")
         continue
     
     # Check if it's a command
