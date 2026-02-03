@@ -9,6 +9,8 @@ import threading
 from urllib.parse import quote
 from requests.exceptions import RequestException
 from datetime import datetime
+import json
+import database
 
 publishKey = 'demo'
 subscribeKey = 'demo'
@@ -57,7 +59,26 @@ def stream(channel: str, callback):
             response = requests.get(receive_url, timeout=10)
             response.raise_for_status()
             data = response.json()
+            messages = data[0]
             tt = data[1]
+            
+            # Save messages to local database
+            for msg in messages:
+                if isinstance(msg, dict):
+                    user = msg.get("user", "Unknown")
+                    text = msg.get("message", "")
+                    # Extract timetoken (provided by PubNub in various formats, 
+                    # but we can also use current time as fallback for system msgs)
+                    msg_tt = str(tt) if "SYSTEM" in user else str(tt) # Simple for now
+                    
+                    # Store in DB
+                    database.save_message(
+                        channel=channel,
+                        user=user,
+                        message=text,
+                        timestamp=datetime.now().strftime("%H:%M:%S"),
+                        timetoken=msg_tt + "_" + str(hash(text)) # Compound key to ensure uniqueness per message
+                    )
             
             if was_failing:
                 add_log(f"Connection restored for #{channel}", "SUCCESS")

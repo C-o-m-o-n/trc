@@ -1,6 +1,7 @@
 ## chat.py
 ## Simple chat client with multi-channel support and error handling
 import communication
+import database
 import sys
 from datetime import datetime
 
@@ -45,6 +46,26 @@ def show_history(channel, count=10):
         
     print(f"{YELLOW}--- End of History ---{RESET}\n")
 
+def show_local_history(channel, count=50):
+    """Display messages stored in the local SQLite database"""
+    print(f"\n{GREEN}--- Local History for #{channel} (Last {count}) ---{RESET}")
+    history = database.get_local_history(channel, count)
+    
+    if history:
+        for msg in history:
+            user = msg.get("user", "Unknown")
+            text = msg.get("message", "")
+            time_str = msg.get("timestamp", "--:--")
+            
+            if "SYSTEM" in user:
+                print(f"{YELLOW}[{time_str}] ⚡ {text}{RESET}")
+            else:
+                print(f"{CYAN}[{time_str}] ← [{user}]: {text}{RESET}")
+    else:
+        print(f"{CYAN}No local history found for this channel.{RESET}")
+        
+    print(f"{GREEN}--- End of Local History ---{RESET}\n")
+
 def show_logs(count=20):
     """Display internal technical logs"""
     print(f"\n{RED}--- Technical Diagnostic Logs (Last {count}) ---{RESET}")
@@ -75,7 +96,8 @@ def show_help():
 ║  {CYAN}/switch #name{YELLOW} - Switch active channel  ║
 ║  {CYAN}/broadcast{YELLOW}    - Send to ALL channels   ║
 ║  {CYAN}/history{YELLOW}      - Show last 10 messages  ║
-║  {CYAN}/history N{YELLOW}    - Show last N messages   ║
+║  {CYAN}/history local{YELLOW} - Show local DB history  ║
+║  {CYAN}/wipe{YELLOW}         - Clear local history    ║
 ║  {CYAN}/logs{YELLOW}         - Show technical logs    ║
 ║  {CYAN}/clear{YELLOW}        - Clear the screen       ║
 ║  {CYAN}/logout{YELLOW}       - Leave the chat         ║
@@ -114,6 +136,10 @@ def join_channel(channel_name):
         return
     
     communication.startStream(channel_name, on_message_received)
+    
+    # Show local history for better offline/low-connection startup
+    show_local_history(channel_name, 20)
+    
     join_msg = {"user": "SYSTEM", "message": f"{current_user} has joined"}
     status = communication.send(channel_name, join_msg)
     
@@ -196,6 +222,14 @@ def handle_command(command):
         if not args:
              show_history(current_channel, 10)
              return
+        
+        if args[0].lower() == "local":
+            count = 50
+            if len(args) > 1:
+                try: count = int(args[1])
+                except ValueError: pass
+            show_local_history(current_channel, count)
+            return
              
         try:
             count = int(args[0])
@@ -204,8 +238,18 @@ def handle_command(command):
                 return
             show_history(current_channel, count)
         except ValueError:
-            print(f"{RED}❌ Invalid number: '{args[0]}'. Usage: /history N{RESET}")
+            print(f"{RED}❌ Invalid argument: '{args[0]}'. Usage: /history [N|local]{RESET}")
     
+    elif cmd == "wipe":
+        confirm = input(f"{RED}Are you sure you want to wipe local history for #{current_channel}? (y/n): {RESET}").lower()
+        if confirm == 'y':
+            if database.clear_channel_history(current_channel):
+                print(f"{GREEN}Local history for #{current_channel} has been wiped.{RESET}")
+            else:
+                print(f"{RED}Failed to clear local history.{RESET}")
+        else:
+            print(f"{YELLOW}Wipe cancelled.{RESET}")
+
     elif cmd == "logs":
         count = 20
         if args:
@@ -310,6 +354,9 @@ print(f"{CYAN}Starting in #{current_channel}{RESET}\n")
 
 # Start listening on default channel
 communication.startStream(current_channel, on_message_received)
+
+# Show local history instantly
+show_local_history(current_channel, 20)
 
 # Announce that we joined
 join_msg = {"user": "SYSTEM", "message": f"{current_user} has joined"}
