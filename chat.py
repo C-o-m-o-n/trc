@@ -2,6 +2,7 @@
 ## Simple chat client with multi-channel support and error handling
 import communication
 import database
+import ai_engine
 import sys
 from datetime import datetime
 
@@ -95,8 +96,9 @@ def show_help():
 ║  {CYAN}/leave #name{YELLOW}  - Leave a channel        ║
 ║  {CYAN}/switch #name{YELLOW} - Switch active channel  ║
 ║  {CYAN}/broadcast{YELLOW}    - Send to ALL channels   ║
-║  {CYAN}/history{YELLOW}      - Show last 10 messages  ║
 ║  {CYAN}/history local{YELLOW} - Show local DB history  ║
+║  {CYAN}/pulse{YELLOW}         - AI Multi-channel Pulse 🛸║
+║  {CYAN}/trc [msg]{YELLOW}     - Direct query to AI Brain🧠║
 ║  {CYAN}/wipe{YELLOW}         - Clear local history    ║
 ║  {CYAN}/logs{YELLOW}         - Show technical logs    ║
 ║  {CYAN}/clear{YELLOW}        - Clear the screen       ║
@@ -240,6 +242,32 @@ def handle_command(command):
         except ValueError:
             print(f"{RED}❌ Invalid argument: '{args[0]}'. Usage: /history [N|local]{RESET}")
     
+    elif cmd == "pulse":
+        print(f"\n{MAGENTA}🛸 [TRC Pulse] Gemini is reasoning over channel history...{RESET}")
+        # Fetch history for ALL joined channels
+        channels = communication.getActiveChannels()
+        multi_history = {}
+        for ch in channels:
+            multi_history[ch] = database.get_local_history(ch, limit=30)
+        
+        report = ai_engine.ai_engine.get_pulse(multi_history)
+        print(f"\n{YELLOW}╔══════════ AI PULSE REPORT ══════════╗{RESET}")
+        print(f"{report}")
+        print(f"{YELLOW}╚═════════════════════════════════════╝{RESET}\n")
+        input(f"{YELLOW}Press Enter to continue...{RESET}")
+
+    elif cmd == "trc":
+        if not args:
+            print(f"{RED}Usage: /trc your question about the current channel{RESET}")
+            return
+        
+        question = " ".join(args)
+        print(f"\n{MAGENTA}🧠 [TRC Brain] Asking Gemini for context...{RESET}")
+        context = database.get_local_history(current_channel, limit=30)
+        answer = ai_engine.ai_engine.generate_response(question, context)
+        print(f"\n{CYAN}🤖 [Gemini]: {answer}{RESET}\n")
+        input(f"{YELLOW}Press Enter to continue...{RESET}")
+
     elif cmd == "wipe":
         confirm = input(f"{RED}Are you sure you want to wipe local history for #{current_channel}? (y/n): {RESET}").lower()
         if confirm == 'y':

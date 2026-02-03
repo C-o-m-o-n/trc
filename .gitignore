@@ -1,5 +1,6 @@
 __pycache__
 *.pyc
 downloads
-TRC/verify_logs.py
-TRC/verify_errors.py
+verify_logs.py
+verify_errors.py
+.env
