@@ -99,6 +99,7 @@ def show_help():
 ║  {CYAN}/history local{YELLOW} - Show local DB history  ║
 ║  {CYAN}/pulse{YELLOW}         - AI Multi-channel Pulse 🛸║
 ║  {CYAN}/trc [msg]{YELLOW}     - Direct query to AI Brain🧠║
+║  {CYAN}/analyze [path]{YELLOW} - Analyze IMG screenshot  👁️║
 ║  {CYAN}/wipe{YELLOW}         - Clear local history    ║
 ║  {CYAN}/logs{YELLOW}         - Show technical logs    ║
 ║  {CYAN}/clear{YELLOW}        - Clear the screen       ║
@@ -266,6 +267,22 @@ def handle_command(command):
         context = database.get_local_history(current_channel, limit=30)
         answer = ai_engine.ai_engine.generate_response(question, context)
         print(f"\n{CYAN}🤖 [Gemini]: {answer}{RESET}\n")
+        input(f"{YELLOW}Press Enter to continue...{RESET}")
+
+    elif cmd == "analyze":
+        if not args:
+            print(f"{RED}Usage: /analyze [path_to_image]{RESET}")
+            return
+        
+        path = args[0]
+        prompt = " ".join(args[1:]) if len(args) > 1 else None
+        
+        print(f"\n{MAGENTA}👁️ [Vision Engine] Gemini is analyzing the image...{RESET}")
+        report = ai_engine.ai_engine.analyze_image(path, prompt)
+        
+        print(f"\n{YELLOW}╔══════════ VISION REPORT ══════════╗{RESET}")
+        print(f"{report}")
+        print(f"{YELLOW}╚═══════════════════════════════════╝{RESET}\n")
         input(f"{YELLOW}Press Enter to continue...{RESET}")
 
     elif cmd == "wipe":
