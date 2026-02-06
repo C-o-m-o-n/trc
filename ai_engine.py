@@ -109,17 +109,23 @@ class TRCAIEngine:
             "and you can read/write local project files to help debug or implement features discussed by the team."
         )
 
-    def generate_response(self, prompt, context_messages=None):
+    def generate_response(self, prompt, channel="general", context_messages=None):
         """Generate a response using the Gemini model with optional context"""
         if not self.client:
             return "⚠️ Gemini API Key not found. Please set GEMINI_API_KEY in your .env file."
 
         try:
+            # Fetch channel topic for context
+            topic = database.get_channel_topic(channel)
+            topic_context = f"CURRENT OBJECTIVE (# {channel}): {topic}\n" if topic else ""
+            
             full_prompt = prompt
             if context_messages:
                 # Format context for the model
                 formatted_context = "\n".join([f"[{m['timestamp']}] {m['user']}: {m['message']}" for m in context_messages])
-                full_prompt = f"Relay Context:\n{formatted_context}\n\nUser Query: {prompt}"
+                full_prompt = f"{topic_context}Relay Context:\n{formatted_context}\n\nUser Query: {prompt}"
+            else:
+                full_prompt = f"{topic_context}User Query: {prompt}"
 
             response = self.client.models.generate_content(
                 model=self.model_name,
