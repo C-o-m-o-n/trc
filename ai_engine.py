@@ -18,6 +18,11 @@ def read_channel_history(channel: str, limit: int = 50) -> str:
         channel: The channel name (e.g., 'general', 'production-logs').
         limit: Number of recent messages to retrieve.
     """
+    # Import locally to avoid color code issues if any, using standard ANSI
+    MAGENTA = "\033[35m"
+    RESET = "\033[0m"
+    print(f"{MAGENTA}🛠️  [Tool] Gemini is reading history for #{channel}...{RESET}")
+    
     history = database.get_local_history(channel, limit=limit)
     if not history:
         return f"No history found for channel #{channel}."
@@ -29,28 +34,79 @@ def read_channel_history(channel: str, limit: int = 50) -> str:
 
 def get_active_relays() -> str:
     """Returns a list of all active relay channels currently monitored by TRC."""
+    MAGENTA = "\033[35m"
+    RESET = "\033[0m"
+    print(f"{MAGENTA}🛠️  [Tool] Gemini is checking active relay network...{RESET}")
+    
     channels = communication.getActiveChannels()
     if not channels:
         return "No active relays currently monitored."
     return "Active Relays: #" + ", #".join(channels)
 
+def read_local_file(path: str) -> str:
+    """Reads the content of a local file in the TRC project directory.
+    
+    Args:
+        path: Relative path to the file (e.g., 'ai_engine.py', 'chat.py').
+    """
+    MAGENTA = "\033[35m"
+    RESET = "\033[0m"
+    print(f"{MAGENTA}🛠️  [Tool] Gemini is reading file: {path}...{RESET}")
+    
+    try:
+        # Basic security: prevent traversing up directories
+        if ".." in path or path.startswith("/") or path.startswith("\\"):
+             return "❌ Error: Access denied. Paths must be relative to the project root."
+             
+        if not os.path.exists(path):
+            return f"❌ Error: File not found at {path}"
+            
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return f"❌ Error reading file: {str(e)}"
+
+def write_local_file(path: str, content: str) -> str:
+    """Writes or overwrites content to a local file in the TRC project directory.
+    
+    Args:
+        path: Relative path to the file.
+        content: The text content to write.
+    """
+    MAGENTA = "\033[35m"
+    RESET = "\033[0m"
+    print(f"{MAGENTA}🛠️  [Tool] Gemini is modifying file: {path}...{RESET}")
+    
+    try:
+        # Basic security: prevent traversing up directories
+        if ".." in path or path.startswith("/") or path.startswith("\\"):
+             return "❌ Error: Access denied. Paths must be relative to the project root."
+             
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return f"✅ Successfully wrote to {path}"
+    except Exception as e:
+        return f"❌ Error writing file: {str(e)}"
+
 class TRCAIEngine:
     def __init__(self, model_name="gemini-2.5-flash"):
         self.model_name = model_name
         self.client = genai.Client(api_key=API_KEY) if API_KEY else None
-        # Define available tools
+        # Define available tools (Gemini 2.5/3 currently don't support combining search with custom functions)
         self.tools = [
             read_channel_history, 
-            get_active_relays, 
-            types.Tool(google_search=types.GoogleSearch())
+            get_active_relays,
+            read_local_file,
+            write_local_file
         ]
         self.system_instruction = (
             "You are the Terminal Relay Controller (TRC) AI Orchestrator. "
             "You are embedded in a multi-channel terminal chat environment. "
             "Your goal is to assist technical teams by analyzing relay history, "
-            "summarizing discussions, and proposing solutions to technical problems. "
+            "summarizing discussions, and proposing/applying solutions to technical problems. "
             "When responding, keep it concise and formatted for a terminal (use ASCII highlights if needed). "
-            "You have access to the history of multiple isolated channels via the TRC relay system and can search the web for technical documentation."
+            "You have access to the history of multiple isolated channels via the TRC relay system, "
+            "and you can read/write local project files to help debug or implement features discussed by the team."
         )
 
     def generate_response(self, prompt, context_messages=None):
