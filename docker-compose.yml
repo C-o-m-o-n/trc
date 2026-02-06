@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  trc:
+    build: .
+    container_name: trc-mission-control
+    volumes:
+      - .:/app
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    stdin_open: true # For interactive terminal
+    tty: true        # For interactive terminal
+    restart: unless-stopped
