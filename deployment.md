@@ -1,6 +1,11 @@
 # Deployment Guide: TRC Mission Control 🛰️🏗️🦾
 
-TRC (Terminal Relay Controller) is designed to be a lightweight, "Always-On" technical guardian. This guide explains how to deploy TRC in professional environments.
+TRC (Terminal Relay Controller) is designed to be a lightweight, "Always-On" technical guardian. This guide explains how to deploy TRC in professional environments. 
+
+> [!IMPORTANT]
+> **Step 0: The Distribution Model**
+> TRC is an **Edge-Native application**. Unlike web-based chat, you do not "visit" TRC. You **host** it. Every deployment starts by cloning the orchestrator:
+> `git clone https://github.com/C-o-m-o-n/trc.git && cd trc`
 
 ## 🐳 Option 1: Docker (Team Command Center)
 The fastest way to deploy TRC for a technical team.

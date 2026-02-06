@@ -33,25 +33,37 @@ TRC doesn't just sync messages; it creates a feedback loop between the network a
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start (Team Setup)
 
-1.  **Dependencies**:
+TRC is distributed as a technical codebase. To get started:
+
+1.  **Clone the Mission Control**:
     ```bash
-    pip install requests google-genai python-dotenv
+    git clone https://github.com/C-o-m-o-n/trc.git
+    cd trc
     ```
-2.  **Configure**: Add your `GEMINI_API_KEY` to a `.env` file.
-3.  **Launch**:
+2.  **Environment Setup**:
+    - Create a `.env` file and add your `GEMINI_API_KEY`.
+    - Install standard requirements: `pip install requests google-genai python-dotenv`
+3.  **Launch Your Engine**:
     ```bash
     python chat.py
     ```
 
 ---
 
-## 🏗️ Universal Deployment
+## 🏗️ How People Use TRC (The User Journey)
 
-TRC is built for the "Always-On" edge.
-- **Docker**: Deploy a team command center in seconds. See [deployment.md](deployment.md).
-- **Raspberry Pi**: Use `scripts/setup_pi.sh` to register TRC as a 24/7 background `systemd` service.
+TRC isn't just a site you visit; it's a **Technical Controller** you deploy.
+
+### 1. The Commander (Initiator)
+A lead engineer clones the repo and starts a relay for a specific technical mission (e.g., `#incident-402`). They set the `/topic` and provide the AI with initial context.
+
+### 2. The Team (Participants)
+Other engineers clone the repo, use the same PubNub keys (configured in `communication.py`), and join the relay. They instantly get the benefits of the "Shared Brain" that has been watching the technical stream.
+
+### 3. The Edge Guard (Always-On)
+The team deploys a **Headless TRC** instance on a Raspberry Pi (using `scripts/setup_pi.sh`) that stays in the channel 24/7, even when humans log off, to provide proactive anomaly detection.
 
 ---
 
