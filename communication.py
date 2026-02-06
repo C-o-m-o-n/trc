@@ -49,10 +49,14 @@ def update_running(value: bool):
     running = value
 
 ## Connect To a Channel
-def stream(channel: str, callback):
+def stream(channel: str, callback, watcher_callback=None):
     tt = '0'
     fail_count = 0
     was_failing = False
+    
+    # Accumulator for proactive AI monitoring
+    accumulator = []
+    ACCUMULATOR_LIMIT = 5 # Analyze every 5 messages
     while running and channel in active_streams:
         receive_url = f'https://ps.pndsn.com/subscribe/{subscribeKey}/{channel}/0/{tt}'
         try:
@@ -79,6 +83,13 @@ def stream(channel: str, callback):
                         timestamp=datetime.now().strftime("%H:%M:%S"),
                         timetoken=msg_tt + "_" + str(hash(text)) # Compound key to ensure uniqueness per message
                     )
+                    
+                    # Accumulate for watcher if user is not SYSTEM
+                    if watcher_callback and user != 'SYSTEM':
+                        accumulator.append({"user": user, "message": text})
+                        if len(accumulator) >= ACCUMULATOR_LIMIT:
+                            watcher_callback(channel, list(accumulator))
+                            accumulator.clear()
             
             if was_failing:
                 add_log(f"Connection restored for #{channel}", "SUCCESS")
@@ -111,14 +122,14 @@ def stream(channel: str, callback):
         finally:
             time.sleep(0.1)
 
-def startStream(channel: str, callback):
-    """Start a stream for a channel"""
+def startStream(channel: str, callback, watcher_callback=None):
+    """Start a stream for a channel with optional AI watcher"""
     if channel in active_streams:
         return active_streams[channel]  # Already streaming
     
     thread = threading.Thread(
         target=stream,
-        args=(channel, callback)
+        args=(channel, callback, watcher_callback)
     )
     # Add to active_streams BEFORE starting thread (fixes race condition)
     active_streams[channel] = thread
