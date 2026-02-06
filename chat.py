@@ -90,20 +90,19 @@ def show_help():
 {YELLOW}╔══════════════════════════════════════════╗
 ║            Available Commands            ║
 ╠══════════════════════════════════════════╣
-║  {CYAN}/help{YELLOW}         - Show this help          ║
-║  {CYAN}/channels{YELLOW}     - List joined channels   ║
-║  {CYAN}/join #name{YELLOW}   - Join a channel         ║
-║  {CYAN}/leave #name{YELLOW}  - Leave a channel        ║
-║  {CYAN}/switch #name{YELLOW} - Switch active channel  ║
-║  {CYAN}/broadcast{YELLOW}    - Send to ALL channels   ║
-║  {CYAN}/history local{YELLOW} - Show local DB history  ║
-║  {CYAN}/pulse{YELLOW}         - AI Multi-channel Pulse 🛸║
-║  {CYAN}/trc [msg]{YELLOW}     - Direct query to AI Brain🧠║
-║  {CYAN}/wipe{YELLOW}         - Clear local history    ║
-║  {CYAN}/logs{YELLOW}         - Show technical logs    ║
-║  {CYAN}/clear{YELLOW}        - Clear the screen       ║
-║  {CYAN}/logout{YELLOW}       - Leave the chat         ║
-╚══════════════════════════════════════════╝{RESET}
+║  {CYAN}/topic [text]{YELLOW}   - Set/View channel context   ║
+║  {CYAN}/who{YELLOW}            - List active relay users    ║
+║  {CYAN}/nick [name]{YELLOW}    - Change your display name    ║
+║  {CYAN}/whisper [msg]{YELLOW}  - Private AI consultation 🤫  ║
+║  {CYAN}/history local{YELLOW} - Show local DB history      ║
+║  {CYAN}/pulse{YELLOW}         - AI Multi-channel Pulse 🛸   ║
+║  {CYAN}/trc [msg]{YELLOW}     - Direct query to AI Brain🧠  ║
+║  {CYAN}/analyze [path]{YELLOW} - Analyze IMG screenshot  👁️ ║
+║  {CYAN}/wipe{YELLOW}         - Clear local history        ║
+║  {CYAN}/logs{YELLOW}         - Show technical logs        ║
+║  {CYAN}/clear{YELLOW}        - Clear the screen           ║
+║  {CYAN}/logout{YELLOW}       - Leave the chat             ║
+╚══════════════════════════════════════════════╝{RESET}
 """)
     input(f"{YELLOW}Press Enter to continue...{RESET}")
 
@@ -124,7 +123,7 @@ def clear_screen():
 
 def join_channel(channel_name):
     """Join a new channel"""
-    global current_channel
+    global current_channel, current_user
     # Remove # if present
     channel_name = channel_name.lstrip('#')
     
@@ -139,9 +138,6 @@ def join_channel(channel_name):
     
     communication.startStream(channel_name, on_message_received)
     
-    # Show local history for better offline/low-connection startup
-    show_local_history(channel_name, 20)
-    
     join_msg = {"user": "SYSTEM", "message": f"{current_user} has joined"}
     status = communication.send(channel_name, join_msg)
     
@@ -153,7 +149,7 @@ def join_channel(channel_name):
 
 def leave_channel(channel_name):
     """Leave a channel"""
-    global current_channel
+    global current_channel, current_user
     channel_name = channel_name.lstrip('#')
     
     if not channel_name:
@@ -201,6 +197,7 @@ def switch_channel(channel_name):
 
 def handle_command(command):
     """Process a command"""
+    global current_user, current_channel
     parts = command[1:].split()
     cmd = parts[0].lower() if parts else ""
     args = parts[1:] if len(parts) > 1 else []
@@ -264,8 +261,24 @@ def handle_command(command):
         question = " ".join(args)
         print(f"\n{MAGENTA}🧠 [TRC Brain] Asking Gemini for context...{RESET}")
         context = database.get_local_history(current_channel, limit=30)
-        answer = ai_engine.ai_engine.generate_response(question, context)
+        answer = ai_engine.ai_engine.generate_response(question, current_channel, context)
         print(f"\n{CYAN}🤖 [Gemini]: {answer}{RESET}\n")
+        input(f"{YELLOW}Press Enter to continue...{RESET}")
+
+    elif cmd == "analyze":
+        if not args:
+            print(f"{RED}Usage: /analyze [path_to_image]{RESET}")
+            return
+        
+        path = args[0]
+        prompt = " ".join(args[1:]) if len(args) > 1 else None
+        
+        print(f"\n{MAGENTA}👁️ [Vision Engine] Gemini is analyzing the image...{RESET}")
+        report = ai_engine.ai_engine.analyze_image(path, prompt)
+        
+        print(f"\n{YELLOW}╔══════════ VISION REPORT ══════════╗{RESET}")
+        print(f"{report}")
+        print(f"{YELLOW}╚═══════════════════════════════════╝{RESET}\n")
         input(f"{YELLOW}Press Enter to continue...{RESET}")
 
     elif cmd == "wipe":
@@ -286,6 +299,60 @@ def handle_command(command):
             except ValueError:
                 pass
         show_logs(count)
+    
+    elif cmd == "topic":
+        if not args:
+            topic = database.get_channel_topic(current_channel)
+            if topic:
+                print(f"{YELLOW}#{current_channel} TOPIC: {topic}{RESET}")
+            else:
+                print(f"{YELLOW}No topic set for #{current_channel}. Use /topic [text] to set one.{RESET}")
+        else:
+            new_topic = " ".join(args)
+            database.set_channel_topic(current_channel, new_topic)
+            print(f"{GREEN}Topic updated! Gemini is now aware of this objective.{RESET}")
+            # Announce to channel
+            topic_msg = {"user": "SYSTEM", "message": f"{current_user} changed the topic to: {new_topic}"}
+            communication.send(current_channel, topic_msg)
+
+    elif cmd == "nick":
+        if not args:
+            print(f"{RED}Usage: /nick new_name{RESET}")
+            return
+        new_nick = args[0]
+        # Same checks as startup
+        if new_nick.upper() in ["SYSTEM", "ADMIN", "ROOT", "SERVER", "MODERATOR"]:
+             print(f"{RED}❌ Reserved name.{RESET}")
+             return
+        
+        old_nick = current_user
+        current_user = new_nick
+        database.update_setting("nick", new_nick)
+        print(f"{GREEN}Your nickname is now {current_user}{RESET}")
+        # Announce to current channel
+        nick_msg = {"user": "SYSTEM", "message": f"{old_nick} is now known as {new_nick}"}
+        communication.send(current_channel, nick_msg)
+
+    elif cmd == "whisper":
+        if not args:
+            print(f"{RED}Usage: /whisper [your private message to Gemini]{RESET}")
+            return
+        question = " ".join(args)
+        print(f"\n{MAGENTA}🤫 [Whisper] Consulting Gemini privately...{RESET}")
+        # Direct response without public relay
+        answer = ai_engine.ai_engine.generate_response(question, current_channel)
+        print(f"\n{CYAN}🤖 [Gemini]: {answer}{RESET}\n")
+
+    elif cmd == "who":
+        users = database.get_active_users(current_channel)
+        print(f"\n{YELLOW}Active in #{current_channel}:{RESET}")
+        if not users:
+            print(f"  {CYAN}No history of other users yet.{RESET}")
+        else:
+            for u in users:
+                prefix = f"{GREEN}●{RESET}" if u == current_user else f"{CYAN}○{RESET}"
+                print(f"  {prefix} {u}")
+        print()
     
     elif cmd == "clear":
         clear_screen()
@@ -351,40 +418,44 @@ def on_message_received(channel, data):
 
 # === MAIN PROGRAM ===
 
-# Welcome and get username
+# Welcome and handle identity
 print(f"{BOLD}{GREEN}Welcome to Chat!{RESET}")
 
-while True:
-    user_input = input(f"{BLUE}Username: {YELLOW}").strip()
-    
-    # 1. Check if empty
-    if not user_input:
-        print(f"{RED}❌ Username cannot be empty.{RESET}")
-        continue
+# Try to load existing nick
+saved_nick = database.get_setting("nick")
+if saved_nick:
+    current_user = saved_nick
+    print(f"{GREEN}Welcome back, {BOLD}{current_user}{RESET}!")
+else:
+    while True:
+        user_input = input(f"{BLUE}Username: {YELLOW}").strip()
         
-    # 2. Check for reserved names (spoof prevention)
-    reserved = ["SYSTEM", "ADMIN", "ROOT", "SERVER", "MODERATOR"]
-    if user_input.upper() in reserved:
-        print(f"{RED}❌ '{user_input}' is a reserved system name. Please choose another.{RESET}")
-        continue
-        
-    # 3. Check for invalid characters (newlines/tabs)
-    if "\n" in user_input or "\r" in user_input or "\t" in user_input:
-        print(f"{RED}❌ Username contains invalid characters.{RESET}")
-        continue
-        
-    # All checks passed
-    current_user = user_input
-    break
+        # 1. Check if empty
+        if not user_input:
+            print(f"{RED}❌ Username cannot be empty.{RESET}")
+            continue
+            
+        # 2. Check for reserved names (spoof prevention)
+        reserved = ["SYSTEM", "ADMIN", "ROOT", "SERVER", "MODERATOR"]
+        if user_input.upper() in reserved:
+            print(f"{RED}❌ '{user_input}' is a reserved system name. Please choose another.{RESET}")
+            continue
+            
+        # 3. Check for invalid characters (newlines/tabs)
+        if "\n" in user_input or "\r" in user_input or "\t" in user_input:
+            print(f"{RED}❌ Username contains invalid characters.{RESET}")
+            continue
+            
+        # All checks passed
+        current_user = user_input
+        database.update_setting("nick", current_user)
+        break
 
 print(f"{GREEN}Joined as {current_user}. Type /help for commands.{RESET}")
 print(f"{CYAN}Starting in #{current_channel}{RESET}\n")
 
 # Start listening on default channel
 communication.startStream(current_channel, on_message_received)
-
-# Show local history instantly
-show_local_history(current_channel, 20)
 
 # Announce that we joined
 join_msg = {"user": "SYSTEM", "message": f"{current_user} has joined"}

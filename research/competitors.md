@@ -3,13 +3,12 @@
 ## 1. The Landscape: Why TRC is different
 The current market is flooded with **1-on-1 personal assistants**. TRC is the only tool focused on **Collaborative Relay Infrastructure**.
 
-| Feature | TRC (Terminal Relay Controller) | Claude Code / Aider / Copilot |
-| :--- | :--- | :--- |
-| **Model** | **Infrastructure (One-to-Many)** | **Assistant (One-to-One)** |
-| **User Role** | Team Coordinator / Relay Broker | Personal Pair Programmer |
-| **Data Source** | Multi-channel history + System Logs | Local codebase only |
-| **Network** | Real-time Pub/Sub (PubNub) | Local File System |
-| **Persistence**| Shared SQLite history | Individual chat logs |
+| Feature | TRC (Terminal Relay Controller) | Gemini CLI (Official) | Claude Code / Aider |
+| :--- | :--- | :--- | :--- |
+| **Model** | **Infrastructure (One-to-Many)** | **Local REPL (Single-User)** | **Pair Programmer (1-on-1)** |
+| **Network** | Real-time Pub/Sub (PubNub) | Local Server + Client | Local File System |
+| **Logic** | Situation Reasoning (Relay) | Tools (File/Shell/Search) | Agentic Code Editing |
+| **Audience** | Operational Teams (SRE/IoT) | Individual Power Users | Software Developers |
 
 ## 2. Who is TRC for? (Target Audience)
 TRC is **not** just a chat app for developers. It is for **Terminal-Centric Operational Teams**:

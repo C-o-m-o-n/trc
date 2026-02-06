@@ -4,3 +4,6 @@ downloads
 verify_logs.py
 verify_errors.py
 .env
+
+test-screenshot.png
+trc_history.db
