@@ -1,6 +1,6 @@
 # Strategic Comparison: TRC vs. IRC 📡⚔️
 
-At a glance, TRC looks like a simple TUI chat similar to IRC (Internet Relay Chat). However, for the **Gemini 3 Hackathon**, the distinction is critical. TRC is not just a chat client; it is an **Intelligence Layer**.
+TRC is an **Intelligence Layer** designed for the modern operational stack. While it shares the TUI DNA of IRC, it is fundamentally an **Intelligence Orchestrator**.
 
 | Feature | IRC (Internet Relay Chat) | TRC (Terminal Relay Controller) |
 | :--- | :--- | :--- |
@@ -11,21 +11,21 @@ At a glance, TRC looks like a simple TUI chat similar to IRC (Internet Relay Cha
 | **Context** | Single-channel focus | Multi-channel technical reasoning |
 
 ## 1. The "Relay" vs. "Chat" Distinction
-In IRC, you join a channel to talk. In TRC, you join a channel to **monitor**. 
-TRC's primary value isn't the typing; it's the **Relay Logic**. Gemini 2.5 Flash sits at the center, watching multiple streams (Relays) and synthesising them into a single "Technical Pulse."
+In IRC, users join a channel to talk. In TRC, they join a channel to **monitor**. 
+TRC's primary value is **Relay Logic**. Gemini 1.5 Flash sits at the center, watching multiple streams (Relays) and synthesizing them into a single "Technical Pulse."
 
-## 2. native AI Orchestration
-Standard IRC bots are **Procedural** (If `!help` then `print help`). 
-TRC's Orchestrator is **Agentic**. It has access to:
--   **Channel History**: (SQLite Querying)
--   **File System**: (Code Inspection)
--   **Vision**: (Multimodal Diagnosis)
+## 2. Native AI Orchestration
+Standard IRC bots are **Procedural** (Static command-response). 
+TRC's Orchestrator is **Agentic**, with direct access to:
+- **Channel History**: (SQLite Querying)
+- **File System**: (Code Inspection)
+- **Vision**: (Multimodal Diagnosis)
 
 ## 3. The "Edge-Native" Advantage
-IRC was built for the 1980s internet. TRC is built for the **24/7 Intelligent Listener** era. 
-TRC is optimized to run headless on a Raspberry Pi or an SRE terminal, acting as a "Proactive Guardian" that pings you only when it identifies a cross-channel anomaly (e.g., a commit in `#git` followed by a spike in `#latency`).
+TRC is optimized for the **24/7 Intelligent Listener** era. 
+It runs headless on Raspberry Pi or SRE terminals as a "Proactive Guardian" that pings the team only when cross-channel anomalies are detected (e.g., correlating a git push with a latency spike).
 
-## Summary for Judges
+## 4. Final Strategic Conclusion
 IRC is about **Transmission**. 
 TRC is about **Observation and Action**. 
-We aren't building a "Messenger"; we are building a **Mission Control for Distributed Teams**.
+We are building a **Mission Control for Distributed Teams**.

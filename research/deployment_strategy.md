@@ -1,12 +1,12 @@
-# Deployment Brainstorming: TRC (Terminal Relay Controller) 🚀🏗️
+# Deployment Architecture: TRC (Terminal Relay Controller) �️🏗️
 
-To win the Gemini Competition, our deployment story must emphasize that TRC isn't just a "chat app"—it's a **Technical Infrastructure**. We should focus on three high-impact deployment tiers:
+TRC emphasizes that technical communication is **Infrastructure**. The system supports three high-impact deployment tiers:
 
 ## 1. The "Edge Listener" (Raspberry Pi / IoT)
 *   **The Story**: Deploy TRC as a headless service on a Raspberry Pi in a server room.
 *   **Capabilities**: 
     - Runs 24/7.
-    - Uses `Monitor Mode` (Phase 2.7) to passively watch production relays.
+    - Uses `Monitor Mode` to passively watch production relays.
     - Gemini alerts the team via mobile/terminal push if the hardware environment or logs go sideways.
 *   **Technical**: Lightweight Python environment + SQLite + PubNub.
 
@@ -16,7 +16,7 @@ To win the Gemini Competition, our deployment story must emphasize that TRC isn'
     - Pre-configured `.env` variables.
     - Shared SQLite volume for cross-session technical memory.
     - Zero-config deployment for new engineers joining a technical crisis.
-*   **Technical**: Build an `antigravity-trc` Docker image with Python 3.11+ dependencies.
+*   **Technical**: Build a `trc-mission-control` Docker image with Python 3.11+ dependencies.
 
 ## 3. The "Headless Orchestrator" (Cloud/Serverless)
 *   **The Story**: Deploy a "Brain-Only" version of TRC that has no TUI but manages the relays autonomously.
@@ -26,11 +26,11 @@ To win the Gemini Competition, our deployment story must emphasize that TRC isn'
     - Accessible via any terminal globally through the PubNub relay.
 *   **Technical**: Run `ai_engine.py` in a background loop on a VPS (EC2/DigitalOcean).
 
-## 🏢 Strategy for the Judges: "The Zero-Footprint Mission Control"
-We should pitch TRC as a tool that requires **zero centralized servers**. 
-- **PubNub** handles the network.
-- **Gemini** handles the intelligence.
-- **The User** brings the hardware.
+## 🏢 Deployment Strategy: "The Zero-Footprint Mission Control"
+TRC requires **zero centralized servers**, making it ideal for the "Edge-Native" era. 
+- **PubNub** handles the globally distributed network.
+- **Gemini** provides the decentralized intelligence.
+- **The User** provides the hardware (Laptop, Docker, or Raspberry Pi).
 
 ### Next Steps for Verification:
 - [ ] Create a `Dockerfile` for easy team setup.
