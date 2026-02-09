@@ -1,6 +1,9 @@
 ## chat.py
 ## Simple chat client with multi-channel support and error handling
 import communication
+import threading
+import time
+import os
 import database
 import ai_engine
 import sys
@@ -85,25 +88,30 @@ def show_logs(count=20):
     input(f"{YELLOW}Press Enter to continue...{RESET}")
 
 def show_help():
-    """Display available commands"""
-    print(f"""
-{YELLOW}╔══════════════════════════════════════════╗
-║            Available Commands            ║
-╠══════════════════════════════════════════╣
-║  {CYAN}/topic [text]{YELLOW}   - Set/View channel context   ║
-║  {CYAN}/who{YELLOW}            - List active relay users    ║
-║  {CYAN}/nick [name]{YELLOW}    - Change your display name    ║
-║  {CYAN}/whisper [msg]{YELLOW}  - Private AI consultation 🤫  ║
-║  {CYAN}/history local{YELLOW} - Show local DB history      ║
-║  {CYAN}/pulse{YELLOW}         - AI Multi-channel Pulse 🛸   ║
-║  {CYAN}/trc [msg]{YELLOW}     - Direct query to AI Brain🧠  ║
-║  {CYAN}/analyze [path]{YELLOW} - Analyze IMG screenshot  👁️ ║
-║  {CYAN}/wipe{YELLOW}         - Clear local history        ║
-║  {CYAN}/logs{YELLOW}         - Show technical logs        ║
-║  {CYAN}/clear{YELLOW}        - Clear the screen           ║
-║  {CYAN}/logout{YELLOW}       - Leave the chat             ║
-╚══════════════════════════════════════════════╝{RESET}
-""")
+    """Show the help menu"""
+    print(f"\n{BOLD}{CYAN}TRC Command Suite - v1.1.0{RESET}")
+    print(f"{YELLOW}--- Messaging ---{RESET}")
+    print(f"  /join #channel       Join and switch to a channel")
+    print(f"  /leave #channel      Leave a channel")
+    print(f"  /switch #channel     Switch active focus")
+    print(f"  /broadcast [text]    Send message to ALL joined channels")
+    print(f"{YELLOW}--- AI Orchestration ---{RESET}")
+    print(f"  /trc [query]         Ask Gemini about current channel history")
+    print(f"  /whisper [text]      Private brainstorm with Gemini (not relayed)")
+    print(f"  /analyze [path]      Send an image/screenshot for AI diagnosis")
+    print(f"  /pulse               Cross-channel technical health report")
+    print(f"{YELLOW}--- IRC & Context ---{RESET}")
+    print(f"  /topic [text]        Set/View channel objective (Gemini-aware)")
+    print(f"  /nick [name]         Change your identity (saved to DB)")
+    print(f"  /who                 List active technical participants")
+    print(f"{YELLOW}--- Utilities ---{RESET}")
+    print(f"  /history [N|local]   Show remote or local SQLite history")
+    print(f"  /logs [N]            View technical diagnostic logs")
+    print(f"  /wipe                Clear local history for current channel")
+    print(f"  /clear               Clear terminal screen")
+    print(f"  /logout              Graceful exit")
+    print(f"\n{MAGENTA}📡 [Monitor Mode]: TRC is passively watching background relays.{RESET}")
+    print(f"{MAGENTA}   Gemini will ALERT you if technical anomalies are detected.{RESET}\n")
     input(f"{YELLOW}Press Enter to continue...{RESET}")
 
 def show_channels():
@@ -136,7 +144,7 @@ def join_channel(channel_name):
         print(f"{YELLOW}Already in #{channel_name}{RESET}")
         return
     
-    communication.startStream(channel_name, on_message_received)
+    communication.startStream(channel_name, on_message_received, on_anomaly_detected)
     
     join_msg = {"user": "SYSTEM", "message": f"{current_user} has joined"}
     status = communication.send(channel_name, join_msg)
@@ -144,6 +152,7 @@ def join_channel(channel_name):
     if status["success"]:
         current_channel = channel_name
         print(f"{GREEN}Joined #{channel_name} and switched to it{RESET}")
+        print(f"{MAGENTA}📡 [Monitor Mode]: Proactive AI watcher enabled for #{channel_name}{RESET}")
     else:
         print(f"{RED}❌ Error joining #{channel_name}: {status['error']}{RESET}")
 
@@ -416,46 +425,80 @@ def on_message_received(channel, data):
         else:
             print(f"\n{CYAN}[{time_str}] ← [{user}]: {text}{RESET}")
 
+def on_anomaly_detected(channel, messages):
+    """Callback when the background AI watcher detects a technical anomaly"""
+    report = ai_engine.ai_engine.detect_anomalies(messages, channel)
+    if report:
+        display_alert(channel, report)
+
+def display_alert(channel, report):
+    """Display a high-visibility AI alert in the terminal"""
+    print(f"\n\n{RED}{BOLD}╔═══════════════════════════════════════════════════╗{RESET}")
+    print(f"{RED}{BOLD}║         ⚠️  AUTONOMOUS TECHNICAL ALERT            ║{RESET}")
+    print(f"{RED}{BOLD}╠═══════════════════════════════════════════════════╣{RESET}")
+    print(f"{YELLOW}  SOURCE: #{channel}{RESET}")
+    print(f"{WHITE}  {report.replace('ALERT:', '').strip()}{RESET}")
+    print(f"{RED}{BOLD}╚═══════════════════════════════════════════════════╝{RESET}\n")
+    # Trigger a small bell sound if terminal supports it
+    print('\a', end='')
+
 # === MAIN PROGRAM ===
+
+# Check for CLI overrides
+cli_nick = None
+if "--nick" in sys.argv:
+    idx = sys.argv.index("--nick")
+    if idx + 1 < len(sys.argv):
+        cli_nick = sys.argv[idx + 1]
 
 # Welcome and handle identity
 print(f"{BOLD}{GREEN}Welcome to Chat!{RESET}")
 
-# Try to load existing nick
-saved_nick = database.get_setting("nick")
-if saved_nick:
-    current_user = saved_nick
-    print(f"{GREEN}Welcome back, {BOLD}{current_user}{RESET}!")
+# 1. Handle CLI Override
+if cli_nick:
+    current_user = cli_nick
+    print(f"{MAGENTA}🎭 CLI Override: Identified as {BOLD}{current_user}{RESET}")
+# 2. Standard initialization
 else:
-    while True:
-        user_input = input(f"{BLUE}Username: {YELLOW}").strip()
-        
-        # 1. Check if empty
-        if not user_input:
-            print(f"{RED}❌ Username cannot be empty.{RESET}")
-            continue
+    saved_nick = database.get_setting("nick")
+    if saved_nick:
+        ans = input(f"Continue as {BOLD}{saved_nick}{RESET}? (Y/n): ").strip().lower()
+        if ans == '' or ans == 'y':
+            current_user = saved_nick
+            print(f"{GREEN}Welcome back, {BOLD}{current_user}{RESET}!")
+        else:
+            saved_nick = None # Reset to trigger new name input
+
+    if not saved_nick:
+        while True:
+            user_input = input(f"{BLUE}Username: {YELLOW}").strip()
             
-        # 2. Check for reserved names (spoof prevention)
-        reserved = ["SYSTEM", "ADMIN", "ROOT", "SERVER", "MODERATOR"]
-        if user_input.upper() in reserved:
-            print(f"{RED}❌ '{user_input}' is a reserved system name. Please choose another.{RESET}")
-            continue
-            
-        # 3. Check for invalid characters (newlines/tabs)
-        if "\n" in user_input or "\r" in user_input or "\t" in user_input:
-            print(f"{RED}❌ Username contains invalid characters.{RESET}")
-            continue
-            
-        # All checks passed
-        current_user = user_input
-        database.update_setting("nick", current_user)
-        break
+            # 1. Check if empty
+            if not user_input:
+                print(f"{RED}❌ Username cannot be empty.{RESET}")
+                continue
+                
+            # 2. Check for reserved names (spoof prevention)
+            reserved = ["SYSTEM", "ADMIN", "ROOT", "SERVER", "MODERATOR"]
+            if user_input.upper() in reserved:
+                print(f"{RED}❌ '{user_input}' is a reserved system name. Please choose another.{RESET}")
+                continue
+                
+            # 3. Check for invalid characters
+            if "\n" in user_input or "\r" in user_input or "\t" in user_input:
+                print(f"{RED}❌ Username contains invalid characters.{RESET}")
+                continue
+                
+            # All checks passed
+            current_user = user_input
+            database.update_setting("nick", current_user)
+            break
 
 print(f"{GREEN}Joined as {current_user}. Type /help for commands.{RESET}")
 print(f"{CYAN}Starting in #{current_channel}{RESET}\n")
 
 # Start listening on default channel
-communication.startStream(current_channel, on_message_received)
+communication.startStream(current_channel, on_message_received, on_anomaly_detected)
 
 # Announce that we joined
 join_msg = {"user": "SYSTEM", "message": f"{current_user} has joined"}

@@ -106,7 +106,9 @@ class TRCAIEngine:
             "summarizing discussions, and proposing/applying solutions to technical problems. "
             "When responding, keep it concise and formatted for a terminal (use ASCII highlights if needed). "
             "You have access to the history of multiple isolated channels via the TRC relay system, "
-            "and you can read/write local project files to help debug or implement features discussed by the team."
+            "and you can read/write local project files to help debug or implement features discussed by the team. "
+            "In 'Monitor Mode', you act as a silent guardian: only alert the team if you detect a high-severity "
+            "technical risk, an unhandled error, or a major blocker."
         )
 
     def generate_response(self, prompt, channel="general", context_messages=None):
@@ -207,6 +209,43 @@ class TRCAIEngine:
             return response.text
         except Exception as e:
             return f"❌ Vision Engine Error: {str(e)}"
+
+    def detect_anomalies(self, messages, channel="general"):
+        """Passively analyze a batch of messages for technical risks or errors."""
+        if not self.client or not messages:
+            return None
+
+        try:
+            # Fetch channel topic for context
+            topic = database.get_channel_topic(channel)
+            topic_context = f"CURRENT OBJECTIVE: {topic}\n" if topic else ""
+
+            # Format the messages for analysis
+            formatted_messages = "\n".join([f"[{m['user']}]: {m['message']}" for m in messages])
+            
+            prompt = (
+                f"{topic_context}\"Analyze the following recent messages from #{channel}.\n"
+                "If you detect a high-severity technical anomaly, a recurring error, a security risk, "
+                "or a critical blocker that prevents the team from reaching the objective, "
+                "return a response starting with 'ALERT:'. Otherwise, return 'STATUS: OK'.\n\n"
+                f"Messages:\n{formatted_messages}"
+            )
+
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                config=types.GenerateContentConfig(
+                    system_instruction=self.system_instruction,
+                    # No tools for passive monitoring to prevent accidental file writes in background
+                ),
+                contents=prompt
+            )
+            
+            text = response.text.strip()
+            if text.upper().startswith("ALERT:"):
+                return text
+            return None # No anomaly detected
+        except Exception:
+            return None
 
 # Singleton instance
 ai_engine = TRCAIEngine()

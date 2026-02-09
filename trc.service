@@ -1,0 +1,16 @@
+[Unit]
+Description=Terminal Relay Controller (TRC) AI Service
+After=network.target
+
+[Service]
+Type=simple
+# Update the path to your python executable and chat.py
+ExecStart=/usr/bin/python3 chat.py
+WorkingDirectory=/path/to/trc
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
