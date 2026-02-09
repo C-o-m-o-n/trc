@@ -1,6 +1,9 @@
 ## chat.py
 ## Simple chat client with multi-channel support and error handling
 import communication
+import threading
+import time
+import os
 import database
 import ai_engine
 import sys
@@ -441,38 +444,55 @@ def display_alert(channel, report):
 
 # === MAIN PROGRAM ===
 
+# Check for CLI overrides
+cli_nick = None
+if "--nick" in sys.argv:
+    idx = sys.argv.index("--nick")
+    if idx + 1 < len(sys.argv):
+        cli_nick = sys.argv[idx + 1]
+
 # Welcome and handle identity
 print(f"{BOLD}{GREEN}Welcome to Chat!{RESET}")
 
-# Try to load existing nick
-saved_nick = database.get_setting("nick")
-if saved_nick:
-    current_user = saved_nick
-    print(f"{GREEN}Welcome back, {BOLD}{current_user}{RESET}!")
+# 1. Handle CLI Override
+if cli_nick:
+    current_user = cli_nick
+    print(f"{MAGENTA}🎭 CLI Override: Identified as {BOLD}{current_user}{RESET}")
+# 2. Standard initialization
 else:
-    while True:
-        user_input = input(f"{BLUE}Username: {YELLOW}").strip()
-        
-        # 1. Check if empty
-        if not user_input:
-            print(f"{RED}❌ Username cannot be empty.{RESET}")
-            continue
+    saved_nick = database.get_setting("nick")
+    if saved_nick:
+        ans = input(f"Continue as {BOLD}{saved_nick}{RESET}? (Y/n): ").strip().lower()
+        if ans == '' or ans == 'y':
+            current_user = saved_nick
+            print(f"{GREEN}Welcome back, {BOLD}{current_user}{RESET}!")
+        else:
+            saved_nick = None # Reset to trigger new name input
+
+    if not saved_nick:
+        while True:
+            user_input = input(f"{BLUE}Username: {YELLOW}").strip()
             
-        # 2. Check for reserved names (spoof prevention)
-        reserved = ["SYSTEM", "ADMIN", "ROOT", "SERVER", "MODERATOR"]
-        if user_input.upper() in reserved:
-            print(f"{RED}❌ '{user_input}' is a reserved system name. Please choose another.{RESET}")
-            continue
-            
-        # 3. Check for invalid characters (newlines/tabs)
-        if "\n" in user_input or "\r" in user_input or "\t" in user_input:
-            print(f"{RED}❌ Username contains invalid characters.{RESET}")
-            continue
-            
-        # All checks passed
-        current_user = user_input
-        database.update_setting("nick", current_user)
-        break
+            # 1. Check if empty
+            if not user_input:
+                print(f"{RED}❌ Username cannot be empty.{RESET}")
+                continue
+                
+            # 2. Check for reserved names (spoof prevention)
+            reserved = ["SYSTEM", "ADMIN", "ROOT", "SERVER", "MODERATOR"]
+            if user_input.upper() in reserved:
+                print(f"{RED}❌ '{user_input}' is a reserved system name. Please choose another.{RESET}")
+                continue
+                
+            # 3. Check for invalid characters
+            if "\n" in user_input or "\r" in user_input or "\t" in user_input:
+                print(f"{RED}❌ Username contains invalid characters.{RESET}")
+                continue
+                
+            # All checks passed
+            current_user = user_input
+            database.update_setting("nick", current_user)
+            break
 
 print(f"{GREEN}Joined as {current_user}. Type /help for commands.{RESET}")
 print(f"{CYAN}Starting in #{current_channel}{RESET}\n")

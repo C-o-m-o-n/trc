@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy requirements or just install directly if requirements.txt doesn't exist
 # For TRC, we know we need: requests, google-genai, python-dotenv
-RUN pip install --no-cache-dir requests google-genai python-dotenv
+RUN pip install --no-cache-dir requests google-genai python-dotenv pubnub
 
 # Copy project files
 COPY . .
