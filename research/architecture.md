@@ -17,7 +17,7 @@ graph TD
     end
 
     subgraph "The Brain (Orchestration)"
-        Gemini[Gemini 1.5 Flash]
+        Gemini[Gemini 2.5 Flash]
         Tools[Technical Tools: Read/Write Code]
         Reasoning[Technical Reasoning]
     end
@@ -39,7 +39,7 @@ graph TD
     Monitor -->|ALERT| TUI
 ```
 
-## 💎 The "Winning" Distinction:
+## 💎 The Distinction:
 Standard chat apps stop at **Synchronization**. 
 TRC completes the **Intelligence Loop**: 
 1. **Listen** (PubNub) 

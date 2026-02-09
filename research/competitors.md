@@ -17,12 +17,12 @@ TRC is **not** just a chat app for developers. It is for **Terminal-Centric Oper
 -   **IoT/Edge Networks**: Distributed Raspberry Pi clusters talking to a central hub. TRC acts as the "Headless Orchestrator."
 -   **Open Source Maintainers**: Coordinating global inputs across isolated relays.
 
-## 3. The "WOW" Factors for Gemini 3
-To win the hackathon, we focus on these "Beyond Chat" capabilities:
+## 3. High-Impact Technical Capabilities
+TRC distinguishes itself through three core "Beyond Chat" pillars:
 
 ### A. The "Relay Brain" (Contextual Reasoning)
-Gemini 3's long context window allows it to "read" the entire history of multiple isolated channels. 
-**Scenario**: You join `#deployment-failure`. You ask `/pulse`. Gemini doesn't just look at that channel; it looks at `#git-commits` and `#production-logs` relays to tell you *exactly* why the failure happened.
+Gemini's long context window allows it to synthesize the history of multiple isolated channels. 
+**Operational Value**: An engineer joining an incident stream can use `/pulse` to instantly correlate git commits with production logs across different relays.
 
 ### B. Mutimodal "Visual Relay"
 Teams often share screenshots of errors. TRC will support "Visual Relaying" where Gemini analyzes the image and relays the technical diagnosis back into the text stream.

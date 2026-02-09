@@ -32,7 +32,7 @@ Transform a Raspberry Pi into a 24/7 "Headless Technical Watcher."
     ```
 3.  **Monitor**:
     - The `trc.service` will start automatically on boot.
-    - AI `Monitor Mode` (Phase 2.7) will watch his background relays even when you are logged off.
+    - AI `Monitor Mode` will watch background relays even when you are logged off.
     - Check service health: `systemctl status trc.service`
 
 ## 🧩 Strategic Overview: The Zero-Footprint Registry
