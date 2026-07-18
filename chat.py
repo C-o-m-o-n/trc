@@ -90,12 +90,13 @@ def show_logs(count=20):
 
 def show_help():
     """Show the help menu"""
-    print(f"\n{BOLD}{CYAN}TRC Command Suite - v1.1.0{RESET}")
+    print(f"\n{BOLD}{CYAN}TRC Command Suite - v1.2.0{RESET}")
     print(f"{YELLOW}--- Messaging ---{RESET}")
     print(f"  /join #channel       Join and switch to a channel")
     print(f"  /leave #channel      Leave a channel")
     print(f"  /switch #channel     Switch active focus")
     print(f"  /broadcast [text]    Send message to ALL joined channels")
+    print(f"  /channels            List all joined channels")
     print(f"{YELLOW}--- AI Orchestration ---{RESET}")
     print(f"  /trc [query]         Ask Gemini about current channel history")
     print(f"  /whisper [text]      Private brainstorm with Gemini (not relayed)")
