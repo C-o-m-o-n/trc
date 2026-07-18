@@ -1,28 +1,28 @@
 ## communication.py module
-## receive messages and send messages
-## threading with ability to start thread using a function callback
+## receive messages and send messages over the PubNub relay network
+## using the official pubnub SDK (real-time subscribe listener + sync publish/history calls)
 
-import time
+import os
 import json
-import requests
 import threading
-from urllib.parse import quote
-from requests.exceptions import RequestException
 from datetime import datetime
-import json
+
+from pubnub.pnconfiguration import PNConfiguration
+from pubnub.pubnub import PubNub
+from pubnub.callbacks import SubscribeCallback
+from pubnub.enums import PNStatusCategory, PNReconnectionPolicy
+from pubnub.exceptions import PubNubException
+
 import database
 
-publishKey = 'demo'
-subscribeKey = 'demo'
+publishKey = os.getenv("PUBLISH_KEY", "demo")
+subscribeKey = os.getenv("SUBSCRIBE_KEY", "demo")
 
 # Constraints
 MAX_MSG_LEN = 2000 # Backend limit higher than UI to allow for formatting
 
 # flag to help with graceful shutdown
 running = True
-
-# Track active streams per channel
-active_streams = {}
 
 # Internal diagnostic logs
 logs = []
@@ -47,163 +47,157 @@ def clear_logs():
 def update_running(value: bool):
     global running
     running = value
+    if not value:
+        pubnub.stop()
 
-## Connect To a Channel
-def stream(channel: str, callback, watcher_callback=None):
-    tt = '0'
-    fail_count = 0
-    was_failing = False
-    
-    # Accumulator for proactive AI monitoring
-    accumulator = []
-    ACCUMULATOR_LIMIT = 5 # Analyze every 5 messages
-    while running and channel in active_streams:
-        receive_url = f'https://ps.pndsn.com/subscribe/{subscribeKey}/{channel}/0/{tt}'
-        try:
-            response = requests.get(receive_url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            messages = data[0]
-            tt = data[1]
-            
-            # Save messages to local database
-            for msg in messages:
-                if isinstance(msg, dict):
-                    user = msg.get("user", "Unknown")
-                    text = msg.get("message", "")
-                    # Extract timetoken (provided by PubNub in various formats, 
-                    # but we can also use current time as fallback for system msgs)
-                    msg_tt = str(tt) if "SYSTEM" in user else str(tt) # Simple for now
-                    
-                    # Store in DB
-                    database.save_message(
-                        channel=channel,
-                        user=user,
-                        message=text,
-                        timestamp=datetime.now().strftime("%H:%M:%S"),
-                        timetoken=msg_tt + "_" + str(hash(text)) # Compound key to ensure uniqueness per message
-                    )
-                    
-                    # Accumulate for watcher if user is not SYSTEM
-                    if watcher_callback and user != 'SYSTEM':
-                        accumulator.append({"user": user, "message": text})
-                        if len(accumulator) >= ACCUMULATOR_LIMIT:
-                            watcher_callback(channel, list(accumulator))
-                            accumulator.clear()
-            
-            if was_failing:
-                add_log(f"Connection restored for #{channel}", "SUCCESS")
-                print(f"\n[+] Connection restored in #{channel}!")
-                was_failing = False
-            
-            fail_count = 0 # Reset on success
-            # Pass channel info along with data
-            callback(channel, data)
-        except RequestException as e:
-            fail_count += 1
-            was_failing = True
-            
-            # Log detailed technical info
-            add_log(f"Stream failure in #{channel}: {str(e)}", "ERROR")
-            
-            # Only alert the user after multiple consecutive failures
-            if fail_count == 5:
-                print(f"\n[!] Connection lost in #{channel}. Retrying in background...")
-            elif fail_count > 5 and fail_count % 30 == 0:
-                # Every ~1 minute (30 * 2s)
-                print(f"[!] Still attempting to reconnect to #{channel} (DNS/Network issue)...")
-            
-            time.sleep(2) # Back off to wait for network recovery
-            continue
-        except Exception as e:
-            add_log(f"Unexpected error in #{channel}: {str(e)}", "CRITICAL")
-            print(f"\n[UNEXPECTED ERROR] #{channel} stream: {e}")
-            break
-        finally:
-            time.sleep(0.1)
+# Per-channel registered callbacks, guarded by _lock since the SDK delivers
+# messages on its own background threads
+_channel_callbacks = {}   # channel -> callback(channel, data)
+_channel_watchers = {}    # channel -> watcher_callback(channel, messages)
+_accumulators = {}        # channel -> accumulated messages for anomaly detection
+ACCUMULATOR_LIMIT = 5      # Analyze every 5 messages
+_lock = threading.Lock()
+
+pnconfig = PNConfiguration()
+pnconfig.publish_key = publishKey
+pnconfig.subscribe_key = subscribeKey
+pnconfig.uuid = f"trc-{os.getpid()}-{id(threading.current_thread())}"
+pnconfig.ssl = True
+pnconfig.reconnect_policy = PNReconnectionPolicy.EXPONENTIAL
+pnconfig.daemon = True # Background subscribe threads die with the main process
+
+
+class _TRCListener(SubscribeCallback):
+    """Dispatches PubNub events to the channel-specific callbacks registered via startStream"""
+
+    def message(self, pn, message_result):
+        channel = message_result.channel
+        payload = message_result.message
+        if not isinstance(payload, dict):
+            return
+
+        user = payload.get("user", "Unknown")
+        text = payload.get("message", "")
+
+        # Real, globally-unique PubNub timetoken - reliable dedup key across reconnects
+        database.save_message(
+            channel=channel,
+            user=user,
+            message=text,
+            timestamp=datetime.now().strftime("%H:%M:%S"),
+            timetoken=str(message_result.timetoken)
+        )
+
+        with _lock:
+            callback = _channel_callbacks.get(channel)
+            watcher_callback = _channel_watchers.get(channel)
+
+        if callback:
+            # Preserve the historical `data[0]` = list-of-messages shape callers expect
+            callback(channel, [[payload], str(message_result.timetoken)])
+
+        if watcher_callback and user != "SYSTEM":
+            batch = None
+            with _lock:
+                acc = _accumulators.setdefault(channel, [])
+                acc.append({"user": user, "message": text})
+                if len(acc) >= ACCUMULATOR_LIMIT:
+                    batch = list(acc)
+                    acc.clear()
+            if batch:
+                watcher_callback(channel, batch)
+
+    def status(self, pn, status):
+        if status.category == PNStatusCategory.PNConnectedCategory:
+            add_log("Connected to PubNub relay network", "SUCCESS")
+        elif status.category == PNStatusCategory.PNReconnectedCategory:
+            add_log("Reconnected to PubNub relay network", "SUCCESS")
+            print("\n[+] Connection restored!")
+        elif status.category == PNStatusCategory.PNUnexpectedDisconnectCategory:
+            add_log("Unexpected disconnect from PubNub relay network", "ERROR")
+            print("\n[!] Connection lost. Retrying in background...")
+        elif status.category == PNStatusCategory.PNAccessDeniedCategory:
+            add_log("Access denied: check your PUBLISH_KEY/SUBSCRIBE_KEY", "ERROR")
+        elif status.is_error():
+            add_log(f"Subscribe status error: {status.category}", "ERROR")
+
+    def presence(self, pn, presence):
+        pass
+
+
+pubnub = PubNub(pnconfig)
+pubnub.add_listener(_TRCListener())
+
 
 def startStream(channel: str, callback, watcher_callback=None):
-    """Start a stream for a channel with optional AI watcher"""
-    if channel in active_streams:
-        return active_streams[channel]  # Already streaming
-    
-    thread = threading.Thread(
-        target=stream,
-        args=(channel, callback, watcher_callback)
-    )
-    # Add to active_streams BEFORE starting thread (fixes race condition)
-    active_streams[channel] = thread
-    thread.daemon = True # Ensure thread dies with main process
-    thread.start()
-    return thread
+    """Start receiving messages for a channel with an optional AI watcher"""
+    with _lock:
+        already_active = channel in _channel_callbacks
+        _channel_callbacks[channel] = callback
+        _channel_watchers[channel] = watcher_callback
+        _accumulators.setdefault(channel, [])
+
+    if already_active:
+        return
+
+    pubnub.subscribe().channels([channel]).execute()
+
 
 def stopStream(channel: str):
     """Stop streaming a specific channel"""
-    if channel in active_streams:
-        del active_streams[channel]
-        return True
-    return False
+    with _lock:
+        if channel not in _channel_callbacks:
+            return False
+        del _channel_callbacks[channel]
+        _channel_watchers.pop(channel, None)
+        _accumulators.pop(channel, None)
+
+    pubnub.unsubscribe().channels([channel]).execute()
+    return True
+
 
 def getActiveChannels():
     """Return list of active channels"""
-    return list(active_streams.keys())
+    with _lock:
+        return list(_channel_callbacks.keys())
+
 
 def send(channel: str, payload: dict):
     """Send a message and return status dict"""
     json_data = json.dumps(payload)
-    
+
     # Basic length validation fallback
     if len(json_data) > MAX_MSG_LEN:
         add_log(f"Send rejected: Payload too large ({len(json_data)} characters)", "WARNING")
         return {"success": False, "error": f"Payload too large (Max {MAX_MSG_LEN})", "code": 413}
 
-    encoded_payload = quote(json_data, safe='')
-    send_url = f'https://ps.pndsn.com/publish/{publishKey}/{subscribeKey}/0/{channel}/0/{encoded_payload}'
     try:
-        response = requests.get(send_url, timeout=5)
-        
-        if response.status_code == 200:
-            return {"success": True, "data": response.json()}
-        elif response.status_code == 403:
-            add_log(f"Send failed (403): Check API keys", "ERROR")
-            return {"success": False, "error": "Forbidden: Check your API keys", "code": 403}
-        elif response.status_code == 429:
-            add_log(f"Send failed (429): Rate limited", "WARNING")
-            return {"success": False, "error": "Rate limited: Slow down!", "code": 429}
-        else:
-            add_log(f"Send failed ({response.status_code})", "ERROR")
-            return {"success": False, "error": f"HTTP Error {response.status_code}", "code": response.status_code}
-            
-    except RequestException as e:
-        add_log(f"Send network error: {str(e)}", "ERROR")
-        return {"success": False, "error": f"Network Error: {type(e).__name__}", "code": 0}
+        envelope = pubnub.publish().channel(channel).message(payload).sync()
+        return {"success": True, "data": envelope.result.timetoken}
+    except PubNubException as e:
+        add_log(f"Send failed: {str(e)}", "ERROR")
+        return {"success": False, "error": str(e), "code": 0}
     except Exception as e:
         add_log(f"Send unexpected error: {str(e)}", "CRITICAL")
         return {"success": False, "error": f"Unexpected Error: {str(e)}", "code": -1}
 
+
 def getHistory(channel: str, count: int = 10):
     """Fetch recent messages and return status dict"""
-    history_url = f'https://ps.pndsn.com/v2/history/sub-key/{subscribeKey}/channel/{channel}?count={count}'
     try:
-        response = requests.get(history_url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            # Messages are in data[0]
-            messages = data[0] if data else []
-            return {"success": True, "data": messages}
-        else:
-            add_log(f"History fetch failed ({response.status_code})", "ERROR")
-            return {"success": False, "error": f"HTTP Error {response.status_code}", "code": response.status_code}
-            
-    except RequestException as e:
-        add_log(f"History network error: {str(e)}", "ERROR")
-        return {"success": False, "error": f"Network Error: {type(e).__name__}", "code": 0}
+        envelope = pubnub.history().channel(channel).count(count).sync()
+        messages = [item.entry for item in envelope.result.messages]
+        return {"success": True, "data": messages}
+    except PubNubException as e:
+        add_log(f"History fetch failed: {str(e)}", "ERROR")
+        return {"success": False, "error": str(e), "code": 0}
     except Exception as e:
         add_log(f"History unexpected error: {str(e)}", "CRITICAL")
         return {"success": False, "error": f"Unexpected Error: {str(e)}", "code": -1}
-        
+
 ## Test for the module
 if __name__ == '__main__':
+    import time
     channel = 'chat'
     startStream(channel, callback=lambda ch, m: print(f"{ch}: {m}"))
     while True:
