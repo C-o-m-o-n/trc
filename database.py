@@ -2,7 +2,7 @@ import sqlite3
 import os
 from datetime import datetime
 
-DB_NAME = "trc_history.db"
+DB_NAME = os.getenv("TRC_DB_PATH", "trc_history.db")
 
 def init_db():
     """Initialize the SQLite database and create tables if they don't exist"""

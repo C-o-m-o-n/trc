@@ -10,7 +10,7 @@ TRC (Terminal Relay Controller) is designed to be a lightweight, "Always-On" tec
 ## 🐳 Option 1: Docker (Team Command Center)
 The fastest way to deploy TRC for a technical team.
 
-1.  **Configure**: Create a `.env` file with your `GEMINI_API_KEY`.
+1.  **Configure**: Create a `.env` file with your `GEMINI_API_KEY`. Optionally set `TRC_DB_PATH` to point the local SQLite history file at a mounted volume path.
 2.  **Launch**:
     ```bash
     docker-compose up -d
@@ -19,7 +19,7 @@ The fastest way to deploy TRC for a technical team.
     ```bash
     docker attach trc-mission-control
     ```
-    *Note: Docker volumes ensure that technical history (`trc_history.db`) persists across container restarts.*
+    *Note: Docker volumes ensure that technical history (`trc_history.db`, or whatever path `TRC_DB_PATH` points at) persists across container restarts.*
 
 ## 🍓 Option 2: Raspberry Pi (Edge Listener)
 Transform a Raspberry Pi into a 24/7 "Headless Technical Watcher."
