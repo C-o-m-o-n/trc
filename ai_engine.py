@@ -12,6 +12,42 @@ load_dotenv()
 # Configure the Gemini API via the new Client architecture
 API_KEY = os.getenv("GEMINI_API_KEY")
 
+PROJECT_ROOT = os.path.realpath(os.path.dirname(os.path.abspath(__file__)))
+
+# Sensitive paths Gemini must never read or write, even though they live
+# inside the project root (secrets, git internals)
+_DENIED_RELATIVE_PATHS = (".env", ".git")
+
+def _resolve_project_path(path: str):
+    """Resolve a model-supplied path against the project root and confirm it's
+    actually contained within it (not just "doesn't start with / or contain
+    ..", which symlinks and other tricks can bypass), and that it doesn't
+    touch a denied sensitive path.
+
+    Returns (resolved_absolute_path, None) on success, or (None, error_message)
+    on failure.
+    """
+    if not path or not isinstance(path, str):
+        return None, "❌ Error: Access denied. A relative file path is required."
+
+    candidate = os.path.realpath(os.path.join(PROJECT_ROOT, path))
+
+    try:
+        common = os.path.commonpath([PROJECT_ROOT, candidate])
+    except ValueError:
+        # e.g. different drives on Windows
+        return None, "❌ Error: Access denied. Paths must be relative to the project root."
+
+    if common != PROJECT_ROOT:
+        return None, "❌ Error: Access denied. Paths must be relative to the project root."
+
+    relative_parts = os.path.relpath(candidate, PROJECT_ROOT).split(os.sep)
+    for denied in _DENIED_RELATIVE_PATHS:
+        if relative_parts[0] == denied:
+            return None, f"❌ Error: Access denied. '{denied}' is a protected path."
+
+    return candidate, None
+
 def read_channel_history(channel: str, limit: int = 50) -> str:
     """Reads the local technical history for a specific relay channel.
     
@@ -53,16 +89,16 @@ def read_local_file(path: str) -> str:
     MAGENTA = "\033[35m"
     RESET = "\033[0m"
     print(f"{MAGENTA}🛠️  [Tool] Gemini is reading file: {path}...{RESET}")
-    
+
+    resolved, error = _resolve_project_path(path)
+    if error:
+        return error
+
     try:
-        # Basic security: prevent traversing up directories
-        if ".." in path or path.startswith("/") or path.startswith("\\"):
-             return "❌ Error: Access denied. Paths must be relative to the project root."
-             
-        if not os.path.exists(path):
+        if not os.path.exists(resolved):
             return f"❌ Error: File not found at {path}"
-            
-        with open(path, "r", encoding="utf-8") as f:
+
+        with open(resolved, "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
         return f"❌ Error reading file: {str(e)}"
@@ -85,15 +121,15 @@ def write_local_file(path: str, content: str) -> str:
     RESET = "\033[0m"
     print(f"{MAGENTA}🛠️  [Tool] Gemini wants to modify file: {path}{RESET}")
 
-    # Basic security: prevent traversing up directories
-    if ".." in path or path.startswith("/") or path.startswith("\\"):
-        return "❌ Error: Access denied. Paths must be relative to the project root."
+    resolved, error = _resolve_project_path(path)
+    if error:
+        return error
 
-    file_existed = os.path.exists(path)
+    file_existed = os.path.exists(resolved)
     old_content = ""
     if file_existed:
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(resolved, "r", encoding="utf-8") as f:
                 old_content = f.read()
         except Exception as e:
             return f"❌ Error reading existing file for diff: {str(e)}"
@@ -119,7 +155,7 @@ def write_local_file(path: str, content: str) -> str:
         return f"❌ Write to {path} was rejected by the human operator. Do not retry without asking them again."
 
     try:
-        with open(path, "w", encoding="utf-8") as f:
+        with open(resolved, "w", encoding="utf-8") as f:
             f.write(content)
         return f"✅ Successfully wrote to {path}"
     except Exception as e:
