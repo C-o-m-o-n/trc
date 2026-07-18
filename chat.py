@@ -12,6 +12,7 @@ from datetime import datetime
 # Colors for terminal
 BOLD = '\033[1m'
 GREEN = '\033[32m'
+WHITE = '\033[37m'
 YELLOW = '\033[33m'
 BLUE = '\033[34m'
 RED = '\033[31m'
