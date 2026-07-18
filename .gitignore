@@ -1,5 +1,6 @@
 __pycache__
 *.pyc
+.pytest_cache
 downloads
 verify_logs.py
 verify_errors.py
