@@ -1,4 +1,5 @@
 import os
+import difflib
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -68,20 +69,56 @@ def read_local_file(path: str) -> str:
 
 def write_local_file(path: str, content: str) -> str:
     """Writes or overwrites content to a local file in the TRC project directory.
-    
+    Always shows a diff preview and requires interactive human confirmation
+    before the write is applied - channel history (which may include content
+    from untrusted relay participants) can otherwise instruct the model to
+    silently overwrite project files.
+
     Args:
         path: Relative path to the file.
         content: The text content to write.
     """
     MAGENTA = "\033[35m"
+    YELLOW = "\033[33m"
+    RED = "\033[31m"
+    GREEN = "\033[32m"
     RESET = "\033[0m"
-    print(f"{MAGENTA}🛠️  [Tool] Gemini is modifying file: {path}...{RESET}")
-    
+    print(f"{MAGENTA}🛠️  [Tool] Gemini wants to modify file: {path}{RESET}")
+
+    # Basic security: prevent traversing up directories
+    if ".." in path or path.startswith("/") or path.startswith("\\"):
+        return "❌ Error: Access denied. Paths must be relative to the project root."
+
+    file_existed = os.path.exists(path)
+    old_content = ""
+    if file_existed:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                old_content = f.read()
+        except Exception as e:
+            return f"❌ Error reading existing file for diff: {str(e)}"
+
+    print(f"\n{YELLOW}╔══ PROPOSED FILE CHANGE: {path} ══╗{RESET}")
+    if file_existed:
+        diff_text = "\n".join(difflib.unified_diff(
+            old_content.splitlines(),
+            content.splitlines(),
+            fromfile=f"a/{path}",
+            tofile=f"b/{path}",
+            lineterm="",
+        ))
+        print(diff_text if diff_text else f"{YELLOW}(no changes){RESET}")
+    else:
+        print(f"{GREEN}(new file){RESET}")
+        print(content)
+    print(f"{YELLOW}╚{'═' * (22 + len(path))}╝{RESET}\n")
+
+    confirm = input(f"{RED}Apply this change to {path}? (y/n): {RESET}").strip().lower()
+    if confirm != "y":
+        print(f"{YELLOW}Write cancelled.{RESET}")
+        return f"❌ Write to {path} was rejected by the human operator. Do not retry without asking them again."
+
     try:
-        # Basic security: prevent traversing up directories
-        if ".." in path or path.startswith("/") or path.startswith("\\"):
-             return "❌ Error: Access denied. Paths must be relative to the project root."
-             
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
         return f"✅ Successfully wrote to {path}"
