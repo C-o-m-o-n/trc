@@ -104,7 +104,7 @@ def show_help():
     print(f"{YELLOW}--- IRC & Context ---{RESET}")
     print(f"  /topic [text]        Set/View channel objective (Gemini-aware)")
     print(f"  /nick [name]         Change your identity (saved to DB)")
-    print(f"  /who                 List active technical participants")
+    print(f"  /who                 List known technical participants")
     print(f"{YELLOW}--- Utilities ---{RESET}")
     print(f"  /history [N|local]   Show remote or local SQLite history")
     print(f"  /logs [N]            View technical diagnostic logs")
@@ -175,18 +175,19 @@ def leave_channel(channel_name):
         print(f"{RED}Can't leave your only channel! Join another first.{RESET}")
         return
     
+    # Leaving is a local action (unsubscribing) and must not be blocked by a
+    # transient network/publish failure - the "has left" broadcast is best-effort.
     leave_msg = {"user": "SYSTEM", "message": f"{current_user} has left"}
     status = communication.send(channel_name, leave_msg)
-    
-    if status["success"]:
-        communication.stopStream(channel_name)
-        if current_channel == channel_name:
-            current_channel = communication.getActiveChannels()[0]
-            print(f"{YELLOW}Left #{channel_name}, switched to #{current_channel}{RESET}")
-        else:
-            print(f"{YELLOW}Left #{channel_name}{RESET}")
+    if not status["success"]:
+        print(f"{RED}⚠️ Could not notify #{channel_name} that you left: {status['error']}{RESET}")
+
+    communication.stopStream(channel_name)
+    if current_channel == channel_name:
+        current_channel = communication.getActiveChannels()[0]
+        print(f"{YELLOW}Left #{channel_name}, switched to #{current_channel}{RESET}")
     else:
-        print(f"{RED}❌ Error leaving #{channel_name}: {status['error']}{RESET}")
+        print(f"{YELLOW}Left #{channel_name}{RESET}")
 
 def switch_channel(channel_name):
     """Switch to a different channel"""
@@ -354,8 +355,8 @@ def handle_command(command):
         print(f"\n{CYAN}🤖 [Gemini]: {answer}{RESET}\n")
 
     elif cmd == "who":
-        users = database.get_active_users(current_channel)
-        print(f"\n{YELLOW}Active in #{current_channel}:{RESET}")
+        users = database.get_known_users(current_channel)
+        print(f"\n{YELLOW}Known participants in #{current_channel}:{RESET}")
         if not users:
             print(f"  {CYAN}No history of other users yet.{RESET}")
         else:

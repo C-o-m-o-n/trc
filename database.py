@@ -172,13 +172,16 @@ def get_setting(key, default=None):
     finally:
         conn.close()
 
-def get_active_users(channel, minutes=1440):
-    """Get a list of users who have been active in a channel recently"""
+def get_known_users(channel):
+    """Get every user who has ever posted in a channel's local history.
+
+    Not a recency filter - the 'timestamp' column is HH:MM:SS with no date,
+    so "active in the last N minutes" isn't answerable without a schema
+    change. This returns all-time known participants instead.
+    """
     try:
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        # In a real app we'd use datetime objects, but our 'timestamp' is HH:MM:SS
-        # For simplicity in this TUI, we'll just return unique users in the total history of the channel
         cursor.execute('''
             SELECT DISTINCT user FROM messages 
             WHERE channel = ? AND user != 'SYSTEM'
